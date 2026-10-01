@@ -111,9 +111,10 @@ def calculate_distance_mtx(tracked_objects: List[TrackedObject], points: np.ndar
     # (nb_tracked_objects, nb_current_detected_points)
     cost_mtx = np.zeros((len(tracked_objects), len(points)))
     for i, tracked_obj in enumerate(tracked_objects):
+        tracked_point = np.asarray(tracked_obj.last_point, dtype=np.float64)
         for j, point in enumerate(points):
-            diff = tracked_obj.last_point - point
-            distance = np.sqrt(diff[0] ** 2 + diff[1] ** 2)
+            diff = tracked_point - np.asarray(point, dtype=np.float64)
+            distance = np.linalg.norm(diff)
             cost_mtx[i][j] = distance
     return cost_mtx
 

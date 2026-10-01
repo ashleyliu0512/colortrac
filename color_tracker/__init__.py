@@ -13,7 +13,7 @@
 
 from .tracker.tracker import ColorTracker
 from .utils import HSVColorRangeDetector
-from .utils.camera import WebCamera
+from .utils.camera import CameraReadError, RetryingCamera, WebCamera, read_with_retry
 
 __author__ = "Gabor Vecsei"
 __version__ = "0.1.1"

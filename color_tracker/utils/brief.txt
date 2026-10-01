@@ -1,0 +1,16 @@
+utils/
+├── camera/
+│   ├── base_camera.py定义摄像头基类 Camera，负责启动和读取线程、返回最新帧、停止摄像头
+│   │                 以及相机标定后的畸变校正接口。
+│   └── web_camera.py定义 WebCamera，继承 Camera，内部使用 OpenCV 的 cv2.VideoCapture 来打开摄像头、取帧
+│                    和释放设备。
+├── color_range_detector.py  HSV 调参工具，通过滑动条调整 HSV 上下限和形态学核
+│                            并实时查看原图、二值掩膜和筛选效果。
+├── helpers.py图像和追踪算法工具，包括 HSV 阈值找轮廓、轮廓筛选/排序、计算目标中心和边界框、ROI 裁剪
+│             以及通过距离和匈牙利算法把当前检测结果匹配到已有目标。
+├── tracker_object.py 定义 TrackedObject，保存目标 ID、最近的中心点轨迹、最后的轮廓/边界框，以及连续漏检帧数。
+└── visualize.py 生成目标显示颜色，并把目标 ID、位置框和移动轨迹画到调试画面上。
+
+tracking.py 使用 ColorTracker 处理帧，使用 WebCamera 获取摄像头画面
+ColorTracker 再调用 helpers.py 做检测和匹配，用 TrackedObject 保存轨迹
+并可通过 visualize.py 绘制调试信息。HSVColorRangeDetector 则是辅助调参的工具。

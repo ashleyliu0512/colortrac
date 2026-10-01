@@ -1,10 +1,15 @@
 import argparse 
 #Python 自带的命令行参数解析：在终端/命令行运行程序时额外传参数，而不需要修改代码里的变量
 from functools import partial 
+from pathlib import Path
+import sys
 import cv2
 import numpy as np
 
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 import color_tracker
+from color_tracker.utils.camera import CameraReadError, RetryingCamera
 
 # You can determine these values with the HSVColorRangeDetector() 
 # HSV（色调、饱和度、亮度）
@@ -26,8 +31,6 @@ COLOR_DISPLAY = {
     "Yellow": (0, 255, 255),
     "Black": (0, 0, 0),
 }
-
-
 def get_args():
     ''' Get the command line arguments. '''
     parser = argparse.ArgumentParser()
@@ -114,11 +117,14 @@ def main():
     # 它的好处是即使程序中途报错退出，也会自动关闭并释放摄像头，防止摄像头被后台占用。
 
         # Start the actual tracking of the object
-        tracker.track(webcam,
-                      hsv_lower_value=args.low,
-                      hsv_upper_value=args.high,
-                      min_contour_area=args.contour_area,
-                      kernel=kernel)
+        try:
+            tracker.track(RetryingCamera(webcam),
+                          hsv_lower_value=args.low,
+                          hsv_upper_value=args.high,
+                          min_contour_area=args.contour_area,
+                          kernel=kernel)
+        except CameraReadError as error:
+            print("Camera read failed; stopping tracking: {0}".format(error))
         #启动死循环正式开始追踪。将摄像头、HSV 下限、HSV 上限、最小过滤面积和形态学核
         #全部传入，程序会一直运行直到按下 ESC 或关掉窗口。
 
