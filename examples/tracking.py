@@ -11,14 +11,20 @@ import color_tracker
 HSV_LOWER_VALUE = [55, 103, 82]
 HSV_UPPER_VALUE = [178, 255, 255]
 COLOR_RANGES = {
-    "RED": [((0, 100, 80), (10, 255, 255)), ((170, 100, 80), (179, 255, 255))],
-    "GREEN": [((35, 80, 50), (85, 255, 255))],
-    "BLUE": [((90, 80, 50), (135, 255, 255))],
+    'Red':       [([0, 100, 50], [10, 255, 255]), ([170, 100, 50], [179, 255, 255])],
+    'LightBlue': [([85, 50, 100], [105, 255, 255])],
+    'Blue':      [([106, 120, 50], [130, 255, 255])],
+    'Green':     [([35, 80, 50], [85, 255, 255])],
+    'Yellow':    [([15, 100, 100], [34, 255, 255])],
+    'Black':     [([0, 0, 0], [180, 255, 45])],
 }
 COLOR_DISPLAY = {
-    "RED": (0, 0, 255),
-    "GREEN": (0, 180, 0),
-    "BLUE": (255, 0, 0),
+    "Red": (0, 0, 255),
+    "LightBlue": (230, 216, 173),
+    "Blue": (255, 0, 0),
+    "Green": (0, 255, 0),
+    "Yellow": (0, 255, 255),
+    "Black": (0, 0, 0),
 }
 
 
@@ -34,16 +40,7 @@ def get_args():
     parser.add_argument("-v", "--verbose", action="store_true")
     args = parser.parse_args()
     return args
-# parser（解析器）：创建一个参数解析对象
-# add_argument：向解析器添加一条规则
-# nargs=3：代表这个参数后面必须跟着 3 个值（对应 H, S, V）。
-# type=int：限制输入的值必须是整数。
-# default=HSV_LOWER_VALUE：如果用户没传这个参数，就默认使用前面定义的 [155, 103, 82]。
-# help：提示说明信息。
-# -c / --contour-area：最小轮廓面积（单位：像素点）
-#-v / --verbose：详细输出开关。
-# parse_args()：开始真正解析命令行命令。
-# return args：把解析出来的所有参数结果打包返回出来。
+
 
 
 def count_objects_in_ranges(frame, color_ranges, kernel, min_contour_area):
@@ -51,6 +48,8 @@ def count_objects_in_ranges(frame, color_ranges, kernel, min_contour_area):
     hsv_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
     mask = None
     for lower, upper in color_ranges:
+        lower = np.asarray(lower, dtype=np.uint8)
+        upper = np.asarray(upper, dtype=np.uint8)
         range_mask = cv2.inRange(hsv_frame, lower, upper)
         mask = range_mask if mask is None else cv2.bitwise_or(mask, range_mask)
 
@@ -61,47 +60,27 @@ def count_objects_in_ranges(frame, color_ranges, kernel, min_contour_area):
     return sum(cv2.contourArea(contour) > min_contour_area for contour in contours)
 
 
-def count_red_objects(frame, kernel, min_contour_area):
-    return count_objects_in_ranges(frame, COLOR_RANGES["RED"], kernel, min_contour_area)
-
-
-def count_green_objects(frame, kernel, min_contour_area):
-    return count_objects_in_ranges(frame, COLOR_RANGES["GREEN"], kernel, min_contour_area)
-
-
-def count_blue_objects(frame, kernel, min_contour_area):
-    return count_objects_in_ranges(frame, COLOR_RANGES["BLUE"], kernel, min_contour_area)
-
-
-def show_color_count(color_name, count):
-    ''' Show one color's count in its own window. '''
-    panel = np.full((120, 260, 3), 245, dtype=np.uint8)
-    color = COLOR_DISPLAY[color_name]
-    cv2.rectangle(panel, (20, 24), (52, 56), color, -1)
-    cv2.putText(panel, color_name, (68, 48), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (35, 35, 35), 2)
-    cv2.putText(panel, "Count: {0}".format(count), (20, 96), cv2.FONT_HERSHEY_SIMPLEX, 0.8,
-                (35, 35, 35), 2)
-    cv2.imshow("{0} count".format(color_name.title()), panel)
+def show_color_counts(counts):
+    ''' Show all detected color counts in a single window. '''
+    panel = np.full((52 + 42 * len(counts), 360, 3), 245, dtype=np.uint8)
+    for index, (color_name, count) in enumerate(counts.items()):
+        y = 36 + index * 42
+        cv2.rectangle(panel, (20, y - 16), (44, y + 8), COLOR_DISPLAY[color_name], -1)
+        cv2.putText(panel, "{0}: {1}".format(color_name, count), (60, y + 3),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (35, 35, 35), 2)
+    cv2.imshow("Color counts", panel)
 
 
 def tracking_callback(tracker: color_tracker.ColorTracker, verbose: bool = True,
                       min_contour_area: float = 2500, kernel=None):
-    #定义函数，接收两个参数：
-    # tracker：当前的追踪器对象（包含画面和目标数据）。
-    # verbose：是否开启详细输出（默认 True）
+    ''' Callback function that is called at every iteration of the tracking loop. '''
 
-    # Visualizing the original frame and the debugger frame
-    cv2.imshow("original frame", tracker.frame)
-    cv2.imshow("debug frame", tracker.debug_frame)
-    color_counter_functions = {
-        "RED": count_red_objects,
-        "GREEN": count_green_objects,
-        "BLUE": count_blue_objects,
-    }
-    for color_name, count_function in color_counter_functions.items():
-        count = count_function(tracker.frame, kernel, min_contour_area)
-        show_color_count(color_name, count)
-
+    cv2.imshow("Camera", tracker.frame)
+    counts = {}
+    for color_name, hsv_bounds in COLOR_RANGES.items():
+        counts[color_name] = count_objects_in_ranges(
+            tracker.frame, hsv_bounds, kernel, min_contour_area)
+    show_color_counts(counts)
     # Stop the script when we press ESC
     key = cv2.waitKey(1)
     if key == 27:
@@ -118,17 +97,15 @@ def main():
 
     # Creating a kernel for the morphology operations
     kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (11, 11))
-    #创建一个 11x11 像素的椭圆形结构元素
-
+   
     # Init the ColorTracker object
-    tracker = color_tracker.ColorTracker(max_nb_of_objects=5, max_nb_of_points=20, debug=True)
+    tracker = color_tracker.ColorTracker(max_nb_of_objects=5, max_nb_of_points=20, debug=False)
 
     # Setting a callback which is called at every iteration
     callback = partial(tracking_callback, verbose=args.verbose,
                        min_contour_area=args.contour_area, kernel=kernel)
     tracker.set_tracking_callback(tracking_callback=callback)
-    # partial(...)：把 为tracking_callback 函数里的 verbose 参数绑定命令行传入的 args.verbose。
-    # set_tracking_callback(...)：把这个函数注册给追踪器。这样追踪器每处理完一帧图像，就会自动调用一次这个函数。
+    
     
     # Start tracking with a camera
     with color_tracker.WebCamera(video_src=0) as webcam:
